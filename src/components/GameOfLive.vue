@@ -2,25 +2,19 @@
 <div ref="game" id="game" class="hello">
   <div :key="i" @click="alive(i)"
   v-bind:class="{
-    'alive': logic[i],
-    /* 'leftT' : logic[i-1] || logic[i - vertical - 1] || logic[i - vertical],
-    'leftB' : logic[i-1] || logic[i + vertical - 1] || logic[i + vertical],
-    'rightT' : logic[i+1] || logic[i - vertical + 1] || logic[i - vertical],
-    'rightB' : logic[i+1] || logic[i + vertical + 1] || logic[i + vertical], */
+    'alive': !!logic[i],
+    'left' : logic[i-1],
+    'right' : logic[i+1],
+    'top' : logic[i - vertical],
+    'bottom' : logic[i + vertical]
     }"
-  class="box" v-for="i in (horizontal * vertical)"
+  :class="'box ' + 'amount-' + logic[i]"
+  v-for="i in (horizontal * vertical)"
   :style="{
     height: (scale * ratio) + '%',
     width: scale + '%'
     }"
   />
-  <div id="menu">
-    <input type="number" v-model="speed" />
-    <button type="button" @click="start" id="start" >start</button>
-    <button type="button" @click="() => {logic = []}" id="stop" >reset</button>
-    <button type="button" @click="stop" id="stop" >stop</button>
-    <button type="button" @click="random" id="stop" >random</button>
-  </div>
 </div>
 </template>
 
@@ -28,18 +22,39 @@
 export default
 {
   name: 'GameOfLive',
+  props: {
+    densitiy: {
+        type: Number,
+        default: 100
+    },
+    speed: {
+      type: Number,
+      default: 1000
+    },
+    running: {
+      type: Boolean,
+      default: true
+    }
+  },
   data () {
     return {
       scale: 1,
       ratio: 1.0,
       logic: [],
       run: null,
-      speed: 500,
       input: "",
-      stoping: true
+      promises: []
     }
   },
   watch: {
+    running: {
+      handler(running) {
+        if(running){
+          this.runGame();
+        }
+      },
+      immediate: true
+    },
     input: function(){
       this.logic = []
       const middleH = Math.floor(this.horizontal / 2);
@@ -126,11 +141,13 @@ export default
     },
   },
   methods: {
+    reset(){
+      this.logic = []
+    },
     random(){
       const length = this.horizontal * this.vertical
-      const amount = Math.floor(Math.random() * (length / 4));
       this.logic = []
-      for(let i = 0; i < amount; i++){
+      for(let i = 0; i < Math.floor(length / (100 /this.densitiy)); i++){
         this.logic[Math.floor(Math.random() * length-1)] = true;
       }
     },
@@ -142,79 +159,74 @@ export default
         delete this.logic[index]
       }
       else{
-        this.logic[index] = true
+        this.logic[index] = 1
       }
     },
     start(event){
       this.stoping = false
       this.runGame()
-      this.runGame()
-
     },
     stop(){
       this.stoping = true
       //clearInterval(this.run)
     },
+    checkBox(i) {
+      let counter = 0;
+      for(let j = -1; j < 2; j++){
+        if(this.logic[i - this.vertical + j]){
+          counter += 1;
+        }
+      }
+      for(let j = -1; j < 2; j++){
+        if(this.logic[i + this.vertical + j]){
+          counter += 1;
+        }
+      }
+      if(this.logic[i-1]){
+        counter += 1;
+      }
+      if(this.logic[i+1]){
+        counter += 1;
+      }
+      return counter === 3 ? 3 : 0
+    },
     runGame() {
-      if(this.stoping){
+      if(!this.running){
         return
       }
-        const n = Object.assign([], this.logic)
-        const checkResurect = (i) => {
-          let counter = 0;
-          for(let j = -1; j < 2; j++){
-            if(this.logic[i- this.vertical + j]){
-              counter += 1;
-            }
-          }
-          for(let j = -1; j < 2; j++){
-            if(this.logic[i + this.vertical + j]){
-              counter += 1;
-            }
-          }
-          if(this.logic[i-1]){
-            counter += 1;
-          }
-          if(this.logic[i+1]){
-            counter += 1;
-          }
-          if(counter == 3){
-            n[i] = true
-          }
-        }
+        const n = []
         const check = (i) => {
-          if (this.logic[i]){
+          if (!!this.logic[i]){
             return 1
           }
-          if(!n[i]){
-            checkResurect(i)
+          const count = this.checkBox(i)
+          if(count){
+            n[i] = count
           }
           return 0
         }
-        for (let i = 0; i < n.length; i++) {
-          if(this.logic[i]){
+        const p = this.logic.map((e, i) => {
             let counter = 0
 
+            counter += check(i + 1)
             counter += check(i - 1)
 
-            counter += check(i + 1)
-
             counter += check(i - this.vertical)
-
             counter += check(i - this.vertical + 1)
-
             counter += check(i - this.vertical - 1)
 
             counter += check(i + this.vertical)
-
-            counter += check(i + this.vertical + 1)
             counter += check(i + this.vertical - 1)
+            counter += check(i + this.vertical + 1)
 
             if(counter != 2 && counter != 3){
-              delete n[i]
+              return null
             }
-          }
-        }
+            else{
+              n[i] = counter
+            }
+          })
+
         this.logic = n;
         setTimeout(this.runGame, this.speed)
       }
@@ -232,36 +244,32 @@ export default
     bottom: 0;
     height: 100vh;
     width: 100vw;
-
-}
-
-#menu{
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  &>div{
-    float: left;
-  }
 }
 
 .box{
-  //border-radius: 50%;
-  width: calc(1% - 2px);
-  float:left;
-  transition: background-color 0.2s ease;
-  &.alive{
+  &:hover{
     background-color: lightgrey;
   }
-  &.leftT{
-    border-top-left-radius: 0;
+  border-radius: 50%;
+  float:left;
+  transition: background-color .5s ease-out;
+  &.alive{
+    background-color: grey;
   }
-  &.leftB{
+  &.left{
+    border-top-left-radius: 0;
     border-bottom-left-radius: 0;
   }
-  &.rightT{
+  &.right{
     border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
   }
-  &.rightB{
+  &.top{
+    border-top-right-radius: 0;
+    border-top-left-radius: 0;
+  }
+  &.bottom{
+    border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
   }
 }
