@@ -252,7 +252,7 @@ export default
   }
   border-radius: 50%;
   float:left;
-  transition: background-color .5s ease-out;
+  transition: background-color .1s ease-in-out;
   &.alive{
     background-color: grey;
   }
